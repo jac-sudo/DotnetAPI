@@ -19,7 +19,7 @@ namespace DotnetAPI.Controllers
         }
 
         [HttpGet("Posts/{postId}/{userId}/{searchParam}")]
-        public IEnumerable<Post> GetPosts(int postId, int userId, string searchParam = "None") {
+        public IEnumerable<Post> GetPosts(int postId = 0, int userId = 0, string searchParam = "None") {
 
             string sql = @"EXEC TutorialAppSchema.spPosts_Get";
             string parameters = "";
@@ -30,7 +30,7 @@ namespace DotnetAPI.Controllers
             if(userId != 0) {
                 parameters += ", @UserId =" + userId.ToString();
             }
-            if(searchParam != "None") {
+            if(searchParam.ToLower() != "none") {
                 parameters += ", @SearchValue ='" + searchParam + "'";
             }
 
@@ -43,15 +43,8 @@ namespace DotnetAPI.Controllers
         [HttpGet("MyPosts")]
         public IEnumerable<Post> GetMyPosts() {
 
-            string sql = @"
-                SELECT [PostId],
-                    [UserId],
-                    [PostTitle],
-                    [PostContent],
-                    [PostCreated],
-                    [PostUpdated] 
-                FROM TutorialAppSchema.Posts
-                    WHERE UserId = '" + User.FindFirst("userId")?.Value.ToString() + "'";
+            string sql = @"EXEC TutorialAppSchema.spPosts_Get @UserId = '" +
+                this.User.FindFirst("userId")?.Value.ToString() + "'";
 
             Console.WriteLine(sql);
 
@@ -59,38 +52,37 @@ namespace DotnetAPI.Controllers
         }
 
         [HttpPost("Post")]
-        public IActionResult AddPost(PostToAddDto postToAdd) {
+        public IActionResult AddPost(PostToAddDto postToAdd)
+        {
             string sql = @"
-            INSERT INTO TutorialAppSchema.Posts (
+            INSERT INTO TutorialAppSchema.Posts(
                 [UserId],
                 [PostTitle],
                 [PostContent],
                 [PostCreated],
-                [PostUpdated]
-            ) VALUES ('" + User.FindFirst("userId")?.Value +
-            "','" + postToAdd.PostTitle +
-            "','" + postToAdd.PostContent +
-            "', GETDATE(), GETDATE() )";
-
-            Console.WriteLine(User.FindFirst("userId")?.Value.ToString());
-
-            if(_dapper.ExecuteSql(sql)) {
+                [PostUpdated]) VALUES ('" + this.User.FindFirst("userId")?.Value.ToString()
+                + "','" + postToAdd.PostTitle
+                + "','" + postToAdd.PostContent
+                + "', GETDATE(), GETDATE() )";
+            if (_dapper.ExecuteSql(sql))
+            {
                 return Ok();
             }
 
-            throw new Exception("Impossibile creare un nuovo post");
+            throw new Exception("Failed to create new post!");
         }
 
+
         //[AllowAnonymous]
-        [HttpPut("Post")]
-        public IActionResult EditPost(PostToEditDto postToEdit) {
-            string sql = @"
-            UPDATE TutorialAppSchema.Posts SET
-                PostContent = '" + postToEdit.PostContent +
-             "', PostTitle = '" + postToEdit.PostTitle +
-             @"', PostUpdated = GETDATE()
-            WHERE PostId = '" + postToEdit.PostId.ToString() +
-            "' AND UserId = '" + this.User.FindFirst("userId")?.Value.ToString() + "'";
+        [HttpPut("UpsertPost")]
+        public IActionResult UpsertPost(Post postToUpsert) {
+            string sql = @"EXEC TutorialAppSchema.spPosts_Upsert
+                @UserId =" + this.User.FindFirst("userId")?.Value +
+                ", @PostTitle = '" + postToUpsert.PostTitle +
+                "', @PostContent = '" + postToUpsert.PostContent + "'";
+
+            if(postToUpsert.PostId > 0)
+                sql += ", @PostId = " + postToUpsert.PostId;
 
             if(_dapper.ExecuteSql(sql)) {
                 return Ok();
@@ -101,7 +93,9 @@ namespace DotnetAPI.Controllers
 
         [HttpDelete("Post/{postId}")]
         public IActionResult DeletePost(int postId) {
-            string sql = "DELETE FROM TutorialAppSchema.Posts WHERE PostId =" + postId.ToString();
+            string sql = @"EXEC TutorialAppSchema.spPost_Delete @PostId = '" +
+                postId.ToString() +
+                    "', @UserId = '" + this.User.FindFirst("userId")?.Value.ToString() + "'";
 
             if(_dapper.ExecuteSql(sql)) {
                 return Ok();
