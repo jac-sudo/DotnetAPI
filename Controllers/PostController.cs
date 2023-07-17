@@ -77,8 +77,8 @@ namespace DotnetAPI.Controllers
         [HttpPut("UpsertPost")]
         public IActionResult UpsertPost(Post postToUpsert) {
             string sql = @"EXEC TutorialAppSchema.spPosts_Upsert
-                @UserId =" + this.User.FindFirst("userId")?.Value +
-                ", @PostTitle = '" + postToUpsert.PostTitle +
+                @UserId = '" + this.User.FindFirst("userId")?.Value.ToString() +
+                "', @PostTitle = '" + postToUpsert.PostTitle +
                 "', @PostContent = '" + postToUpsert.PostContent + "'";
 
             if(postToUpsert.PostId > 0)
