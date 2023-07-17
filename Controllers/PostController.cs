@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace DotnetAPI.Controllers
 {
-    [Authorize]
+    // [Authorize]
     [ApiController]
     [Route("[controller]")]
     public class PostController : ControllerBase
@@ -18,32 +18,24 @@ namespace DotnetAPI.Controllers
             _dapper = new DataContextDapper(config);
         }
 
-        [HttpGet("PostSingle/{postId}")]
-        public IEnumerable<Post> GetPosts(int postId) {
+        [HttpGet("Posts/{postId}/{userId}/{searchParam}")]
+        public IEnumerable<Post> GetPosts(int postId, int userId, string searchParam = "None") {
 
-            string sql = @"
-                SELECT [PostId],
-                    [UserId],
-                    [PostTitle],
-                    [PostContent],
-                    [PostCreated],
-                    [PostUpdated] FROM TutorialAppSchema.Posts 
-                        WHERE PostId = '" + postId.ToString() + "'";
+            string sql = @"EXEC TutorialAppSchema.spPosts_Get";
+            string parameters = "";
 
-            return _dapper.LoadData<Post>(sql);
-        }
+            if(postId != 0) {
+                parameters += ", @PostId =" + postId.ToString();
+            }
+            if(userId != 0) {
+                parameters += ", @UserId =" + userId.ToString();
+            }
+            if(searchParam != "None") {
+                parameters += ", @SearchValue ='" + searchParam + "'";
+            }
 
-        [HttpGet("PostsByUser/{userId}")]
-        public IEnumerable<Post> GetPostsByUser(int userId) {
-
-            string sql = @"
-                SELECT [PostId],
-                    [UserId],
-                    [PostTitle],
-                    [PostContent],
-                    [PostCreated],
-                    [PostUpdated] FROM TutorialAppSchema.Posts 
-                        WHERE PostId = '" + userId.ToString() + "'";
+            if(parameters.Length > 0)
+                sql += parameters.Substring(1);
 
             return _dapper.LoadData<Post>(sql);
         }
@@ -59,8 +51,9 @@ namespace DotnetAPI.Controllers
                     [PostCreated],
                     [PostUpdated] 
                 FROM TutorialAppSchema.Posts
-                    WHERE PostId = " + User.FindFirst("userId")?.Value;
+                    WHERE UserId = '" + User.FindFirst("userId")?.Value.ToString() + "'";
 
+            Console.WriteLine(sql);
 
             return _dapper.LoadData<Post>(sql);
         }
@@ -74,10 +67,12 @@ namespace DotnetAPI.Controllers
                 [PostContent],
                 [PostCreated],
                 [PostUpdated]
-            ) VALUES (" + User.FindFirst("userId")?.Value +
-            ", '" + postToAdd.PostTitle +
-            ", '" + postToAdd.PostContent +
-            "', GETDATE(), GETDATE())";
+            ) VALUES ('" + User.FindFirst("userId")?.Value +
+            "','" + postToAdd.PostTitle +
+            "','" + postToAdd.PostContent +
+            "', GETDATE(), GETDATE() )";
+
+            Console.WriteLine(User.FindFirst("userId")?.Value.ToString());
 
             if(_dapper.ExecuteSql(sql)) {
                 return Ok();
@@ -94,8 +89,8 @@ namespace DotnetAPI.Controllers
                 PostContent = '" + postToEdit.PostContent +
              "', PostTitle = '" + postToEdit.PostTitle +
              @"', PostUpdated = GETDATE()
-            WHERE PostId = " + postToEdit.PostId.ToString() +
-            "AND UserId = " + this.User.FindFirst("userId")?.Value;
+            WHERE PostId = '" + postToEdit.PostId.ToString() +
+            "' AND UserId = '" + this.User.FindFirst("userId")?.Value.ToString() + "'";
 
             if(_dapper.ExecuteSql(sql)) {
                 return Ok();
